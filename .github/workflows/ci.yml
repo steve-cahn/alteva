@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Lint, test, build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: alteva
+          POSTGRES_PASSWORD: alteva_password
+          POSTGRES_DB: alteva_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U alteva -d alteva_db"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://alteva:alteva_password@localhost:5432/alteva_db
+      # Fail, rather than silently skip, the database-backed tests if Postgres is unreachable.
+      REQUIRE_DB: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.18.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r lint
+      - run: pnpm -r test
+      - run: pnpm --filter @alteva/web build
+
+  images:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose build

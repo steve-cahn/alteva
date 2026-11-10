@@ -1,0 +1,182 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Every colour in the UI comes from here, so light and dark mode are one switch.
+ * Palette: a cool slate base, a single indigo accent, and soft tinted status colours.
+ */
+:root {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #f1f3f9;
+  --line: #e2e6ef;
+  --line-strong: #cdd3e0;
+  --ink: #0e1528;
+  --muted: #566078;
+  --faint: #8993a8;
+
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-soft: #eceefe;
+  --primary-ink: #4338ca;
+
+  --success: #059669;
+  --success-soft: #e4f7ef;
+  --danger: #e11d48;
+  --danger-soft: #fde9ee;
+  --warning: #b45309;
+  --warning-soft: #fef1dc;
+  --info: #2563eb;
+  --info-soft: #e6efff;
+
+  --glow-1: rgb(99 102 241 / 0.16);
+  --glow-2: rgb(14 165 233 / 0.12);
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -12px rgb(15 23 42 / 0.12);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #080c18;
+    --surface: #0f1527;
+    --surface-2: #161d33;
+    --line: #222b45;
+    --line-strong: #323e5e;
+    --ink: #eef1f9;
+    --muted: #a2acc3;
+    --faint: #6d7893;
+
+    --primary: #6366f1;
+    --primary-hover: #7c7ff5;
+    --primary-soft: #1b2046;
+    --primary-ink: #a5b0ff;
+
+    --success: #34d399;
+    --success-soft: #0d2a22;
+    --danger: #fb7185;
+    --danger-soft: #2f1219;
+    --warning: #fbbf24;
+    --warning-soft: #2c2008;
+    --info: #60a5fa;
+    --info-soft: #11233f;
+
+    --glow-1: rgb(99 102 241 / 0.22);
+    --glow-2: rgb(14 165 233 / 0.14);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-ink: var(--primary-ink);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --shadow-card: var(--shadow-card);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* One focus style for everything interactive: visible, on-brand, never removed. */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::selection {
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+}
+
+/* A soft, dotted backdrop used behind the hero. */
+.bg-dots {
+  background-image: radial-gradient(var(--line-strong) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse at 50% 0%, #000 0%, transparent 70%);
+}
+
+.text-gradient {
+  background: linear-gradient(100deg, var(--primary) 0%, #0ea5e9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Motion is decoration: it only runs when the user has not asked for less of it. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+  @keyframes pulse-ring {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 7px transparent;
+    }
+  }
+  .animate-fade-up {
+    animation: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-pulse-ring {
+    animation: pulse-ring 1.6s ease-out infinite;
+  }
+  .animate-shimmer {
+    background-size: 200% 100%;
+    animation: shimmer 2.2s linear infinite;
+  }
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 50%, var(--surface-2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    background: var(--surface-2);
+  }
+}

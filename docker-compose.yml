@@ -1,16 +1,116 @@
+# Credentials default to the development values below and can be overridden from a .env file or the
+# environment (see .env.example). Change them before running this anywhere that is not your own
+# machine, and before the FIRST start: Postgres only reads its password when it creates the volume.
+# A password used inside a connection URL must be URL-encoded.
+
+x-credentials: &credentials
+  DATABASE_URL: postgres://${POSTGRES_USER:-alteva}:${POSTGRES_PASSWORD:-alteva_password}@postgres:5432/${POSTGRES_DB:-alteva_db}
+  RABBITMQ_URL: amqp://${RABBITMQ_USER:-alteva}:${RABBITMQ_PASSWORD:-alteva_password}@rabbitmq:5672
+
+# What an application container needs, and nothing more: no extra Linux capabilities, no way to gain
+# privileges, and time to finish in-flight work on `docker stop` (the services give up after 25 s).
+x-hardened: &hardened
+  restart: unless-stopped
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  stop_grace_period: 30s
+
 services:
   postgres:
     image: postgres:17
     container_name: alteva-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: alteva
-      POSTGRES_PASSWORD: alteva_password
-      POSTGRES_DB: alteva_db
+      POSTGRES_USER: ${POSTGRES_USER:-alteva}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alteva_password}
+      POSTGRES_DB: ${POSTGRES_DB:-alteva_db}
     ports:
-      - "5442:5432"
+      - "127.0.0.1:5442:5432" # the host only: the database is not for the network
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-alteva} -d ${POSTGRES_DB:-alteva_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: alteva-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-alteva}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-alteva_password}
+    ports:
+      - "127.0.0.1:5672:5672" # the host only, like the database
+      - "127.0.0.1:15672:15672" # management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    <<: *hardened
+    build: { context: ., target: api }
+    read_only: true
+    environment:
+      <<: *credentials
+      PORT: "4000"
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:4000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  # Stateless competing consumers: add more with `docker compose up -d --scale worker=3`. The health
+  # port is deliberately not published to the host, so replicas do not collide on it.
+  worker:
+    <<: *hardened
+    build: { context: ., target: worker }
+    read_only: true
+    environment:
+      <<: *credentials
+      PORT: "4001"
+    depends_on:
+      api: { condition: service_healthy } # api owns migrations
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:4001/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  web:
+    <<: *hardened
+    build:
+      context: .
+      target: web
+      args:
+        # Baked into the browser bundle at build time; the browser reaches the api on the host port.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    environment:
+      PORT: "3000"
+    ports:
+      - "3100:3000" # 3000 is often taken on dev machines
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
 
 volumes:
   postgres_data:
+  rabbitmq_data:

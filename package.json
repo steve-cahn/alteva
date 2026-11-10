@@ -1,31 +1,15 @@
 {
   "name": "alteva",
-  "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "@prisma/adapter-pg": "^7.10.1",
-    "@prisma/client": "^7.10.1",
-    "dotenv": "^18.0.10",
-    "next": "16.4.6",
-    "pg": "^8.23.1",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "dev": "pnpm --filter @alteva/web dev",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test:integration": "docker compose up -d --wait postgres && REQUIRE_DB=1 pnpm -r test",
+    "build:services": "pnpm --filter @alteva/api build && pnpm --filter @alteva/worker build"
   },
   "devDependencies": {
-    "@tailwindcss/turbopack": "4.3.3",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.4.6",
-    "prisma": "^7.10.1",
-    "tailwindcss": "4.3.3",
-    "typescript": "^5"
+    "esbuild": "0.28.2"
   }
 }
