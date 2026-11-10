@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: alteva-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: alteva
+      POSTGRES_PASSWORD: alteva_password
+      POSTGRES_DB: alteva_db
+    ports:
+      - "5442:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
