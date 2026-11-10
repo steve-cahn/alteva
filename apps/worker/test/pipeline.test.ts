@@ -297,6 +297,30 @@ describe.skipIf(!dbUp)("processPage (postgres)", () => {
     });
   });
 
+  describe("a page that lands on http after a same-host redirect (a proxy with a wrong-scheme trailing-slash redirect)", () => {
+    it("is crawled normally: its links are still the site's own, and it is stored under the address that was requested", async () => {
+      const { jobId } = await seed();
+      await run({ [ROOT]: html("/tag/love", "/tag/life") }, task(jobId, ROOT));
+
+      // /tag/love 308s to http://site.test/tag/love/ ; its links resolve against THAT address.
+      const landedOnHttp: FetchResult = {
+        kind: "html",
+        httpStatus: 200,
+        finalUrl: "http://site.test/tag/love/",
+        html: '<a href="/tag/life/">life</a><a href="/tag/love/page/1/">more</a><a href="/tag/love/">itself</a><a href="https://other.test/x">out</a>',
+      };
+      const outcome = await processPage({ pool: db.pool, fetchPage: async () => landedOnHttp }, task(jobId, "https://site.test/tag/love", 1, 1), log);
+
+      expect(outcome).toMatchObject({ kind: "processed" });
+      if (outcome.kind === "processed") {
+        // /tag/life already exists, itself is not a link, so only the new page is queued, as https.
+        expect(outcome.children.map((c) => c.url)).toEqual(["https://site.test/tag/love/page/1"]);
+      }
+      expect(await pageRow(jobId, "https://site.test/tag/love")).toMatchObject({ status: "done", outgoing_count: 3, internal_count: 2 });
+      expect(await count("pages", jobId)).toBe(4); // root, /tag/love, /tag/life, /tag/love/page/1: never an http twin
+    });
+  });
+
   describe("a start page that redirects", () => {
     const redirectingTo = (finalUrl: string, ...hrefs: string[]) => async (): Promise<FetchResult> => ({
       kind: "html",

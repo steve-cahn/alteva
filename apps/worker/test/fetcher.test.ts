@@ -277,14 +277,41 @@ describe("fetchPage: redirects", () => {
     expect(asked.length).toBe(6);
   });
 
-  it("refuses a redirect from https down to http, without requesting the http URL", async () => {
-    const { asked, options } = stub({ "https://a.test/": redirect("http://a.test/plain") });
+  it("refuses a redirect from https down to http on ANOTHER host, without requesting it", async () => {
+    const { asked, options } = stub({ "https://a.test/": redirect("http://b.test/plain") });
     expect(await fetchPage("https://a.test/", options)).toMatchObject({
       kind: "failed",
       retryable: false,
-      error: "redirect from https to http refused",
+      error: "redirect from https to http on another host refused",
     });
     expect(asked).toEqual(["https://a.test/"]);
+  });
+
+  it("follows a downgrade to the SAME host: a site behind a proxy that builds its trailing-slash redirect with http", async () => {
+    // What quotes.toscrape.com and books.toscrape.com really answer.
+    const { asked, options } = stub({
+      "https://a.test/tag/love": redirect("http://a.test/tag/love/", 308),
+      "http://a.test/tag/love/": page("<a href='/tag/life/'>x</a>"),
+    });
+    expect(await fetchPage("https://a.test/tag/love", options)).toMatchObject({
+      kind: "html",
+      finalUrl: "http://a.test/tag/love/",
+      html: "<a href='/tag/life/'>x</a>",
+    });
+    expect(asked).toEqual(["https://a.test/tag/love", "http://a.test/tag/love/"]);
+  });
+
+  it("treats www and the bare host as the same host for that rule", async () => {
+    const { options } = stub({ "https://www.a.test/x": redirect("http://a.test/x/"), "http://a.test/x/": page() });
+    expect(await fetchPage("https://www.a.test/x", options)).toMatchObject({ kind: "html", finalUrl: "http://a.test/x/" });
+  });
+
+  it("still refuses a downgrade that arrives part-way along a chain to another host", async () => {
+    const { options } = stub({
+      "https://a.test/": redirect("https://b.test/next"),
+      "https://b.test/next": redirect("http://c.test/end"),
+    });
+    expect(await fetchPage("https://a.test/", options)).toMatchObject({ kind: "failed", error: "redirect from https to http on another host refused" });
   });
 
   it.each([

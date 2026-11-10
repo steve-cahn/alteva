@@ -32,7 +32,7 @@ Dependencies point inward: apps import `core`; `core` imports no app.
 1. **`POST /api/jobs`** validates the URL and depth, then in **one transaction** inserts the job, its root page (`depth 0`, `queued`) and a message in the `outbox` table. It answers `202` and nudges its relay.
 2. The **relay** publishes outbox rows to the `crawl` exchange (publisher confirms), marking each published. Any process may run a relay: rows are claimed with `FOR UPDATE SKIP LOCKED`.
 3. A **worker** takes the message from `crawl.page` (prefetch 5, manual ack) and, before fetching, skips it if the job is finished or canceled.
-4. It **fetches** the page (outside any transaction): 10 s per attempt, 45 s in total, redirects followed by hand (at most 5, never https to http), body capped at 2 MB, HTML only. Transient failures are retried in-process with backoff and `Retry-After`.
+4. It **fetches** the page (outside any transaction): 10 s per attempt, 45 s in total, redirects followed by hand (at most 5, never https to http on another host), body capped at 2 MB, HTML only. Transient failures are retried in-process with backoff and `Retry-After`.
 5. In **one transaction** it locks the job row, then: claims the page (`UPDATE ... WHERE status = 'queued'`; no row back means a duplicate delivery), records the page's metrics and edges, inserts child pages for new internal links within the depth and page budget, queues their messages in the outbox, and updates the job's counters, completing the job when processed equals discovered.
 6. It **acks**. Its relay publishes the children, and the cycle repeats until nothing is left.
 

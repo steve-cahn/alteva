@@ -132,7 +132,7 @@ pnpm test:integration     # starts compose Postgres, then fails (not skips) if i
 pnpm lint                 # type-checks every package, and lints the web app
 ```
 
-The suites, **605 tests** in all (core 113, api 174, worker 169, web 149):
+The suites, **609 tests** in all (core 113, api 174, worker 173, web 149):
 
 - **Unit tests for the rules the brief names**: URL normalization (relative links, fragments, ports, trailing slashes, `<base href>`) and the Domain Link Ratio (`packages/core/test`).
 - **Integration tests over local HTML fixtures**: a fixture site is served over real HTTP and crawled by the real worker pipeline into a real Postgres, asserting exact pages, edges, ratios, the depth limits (0, 1, 2) and the page limit, skipped and failed pages, and job completion (`apps/worker/test/crawl.integration.test.ts`).
@@ -300,7 +300,7 @@ Errors always look like `{ "error": { "code", "message", "details?", "correlatio
 **Retries.** Topology: `crawl.page` (work), `crawl.page.retry` (10s TTL, dead-letters back to `crawl.page`), `crawl.page.dlq`. Up to **3 attempts** in total, counted in an `x-attempt` header. This is the second level: the fetch itself first retries transient errors in-process (up to 2 more tries, exponential backoff with jitter from 500 ms, honouring a `Retry-After` of up to 10 s), all within a 45 s budget per page.
 
 - *Transient* (retried): timeouts, `ECONNRESET`/`ECONNREFUSED`, DNS errors, HTTP 5xx, 408 and 429, database connection errors.
-- *Permanent* (no retry, recorded and counted as processed): HTTP 4xx (except 408 and 429), non-HTML content (`skipped`), oversized bodies, TLS and malformed-URL errors, and redirects that loop, exceed 5 hops, leave http(s), or go from https down to http.
+- *Permanent* (no retry, recorded and counted as processed): HTTP 4xx (except 408 and 429), non-HTML content (`skipped`), oversized bodies, TLS and malformed-URL errors, and redirects that loop, exceed 5 hops, leave http(s), or go from https down to http on a *different* host. A downgrade to the *same* host is followed: it is the site's own doing, and a common one (a proxy that builds its trailing-slash redirect with the wrong scheme, as `quotes.toscrape.com` does), so refusing it would fail every page of such a site.
 
 **Dead letters.** Routed to `crawl.page.dlq`: malformed messages (bad JSON or schema), messages whose retries are exhausted, and unrecoverable processing errors. For exhausted or unrecoverable ones the page is first marked `failed` and counted as processed, so the job can still complete.
 

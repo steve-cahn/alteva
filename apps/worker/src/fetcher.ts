@@ -1,3 +1,4 @@
+import { comparableHost } from "@alteva/core";
 import { errorCode, isTransientNetworkError } from "./errors";
 
 export interface FetchOptions {
@@ -97,7 +98,10 @@ async function fetchOnce(url: string, options: FetchOptions, deadline: number): 
 
 /**
  * Follows redirects by hand so each hop can be checked: at most `maxRedirects`, only to http(s), and
- * never from https down to http (which would expose the request to anyone on the path).
+ * never from https down to http on ANOTHER host, which would hand the request to a server (and to
+ * anyone on the path) that the page never named. A downgrade to the SAME host is followed: it is the
+ * site's own doing, and a common one (a TLS-terminating proxy building its trailing-slash redirect
+ * with the wrong scheme, as quotes.toscrape.com does). Refusing it would fail every page of such a site.
  */
 async function followRedirects(startUrl: string, options: FetchOptions, signal: AbortSignal): Promise<FetchResult> {
   const doFetch = options.fetchFn ?? fetch;
@@ -124,8 +128,9 @@ async function followRedirects(startUrl: string, options: FetchOptions, signal: 
     if (next.protocol !== "http:" && next.protocol !== "https:") {
       return permanentFailure(res.status, `redirect to a non-http(s) URL: ${next.protocol}`);
     }
-    if (new URL(current).protocol === "https:" && next.protocol === "http:") {
-      return permanentFailure(res.status, "redirect from https to http refused");
+    const from = new URL(current);
+    if (from.protocol === "https:" && next.protocol === "http:" && comparableHost(from.hostname) !== comparableHost(next.hostname)) {
+      return permanentFailure(res.status, "redirect from https to http on another host refused");
     }
     current = next.href;
   }
